@@ -1,0 +1,284 @@
+---
+title: "MIA.SE.hill.methods.code.03-04-19"
+author: "Maggie Anderson"
+date: "March 3, 2019"
+output:
+  word_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+########## setwd, load libraries and data ##########
+```{r}
+
+setwd("~/Lawrence/2018-19/Winter_2019/Senior_exp/code/working.directory")
+
+{library(plyr)
+library(igraph)
+library(rlang)
+library(ggplot2)
+library(reshape)
+library(httr)
+library(tidyr)
+library(tidyverse) 
+library(vegetarian)
+library(devtools)
+library(vegan)
+library(msm)
+library(rcompanion)
+library(car)
+library(MASS)
+library(RColorBrewer)
+library(permute)}
+
+#load data
+  tree.df <- read.csv("tree.df.csv")                # NPP and raw data for all measured trees (df0.all)
+  site.sp <- read.csv("site.sp.final2.csv")         # site x sp matrix (species div.) for NMDS/hclust (site.sp4)
+  site.fun <- read.csv("site.fun.final.csv")        # site x sp (functional div.) matrix for NMDS/hclust (fun.site.sp1)
+  env.data <- read.csv("env.data.final.csv")        # environmental data for NMDS (env.data2)
+  df.tuk <- read.csv("df.tuk.final3.csv")            # df with tukey-transf. npp and shannon for both species and functional diversity (log.test), 1 NA removed
+  df.env <- read.csv("df.env.npp2.csv")             # env data for CCA and NMDS w/ NPP (all trees)
+  site.fun2 <- read.csv("site.fun2.csv")            # site x sp (functional div.) matrix for NMDS/hclust w/ neogagtes incorporated 
+  env.hill <- read.csv("df.env.hill.csv")           # environmental data including hill numbers
+```
+
+########## 1: plot NPP and diversity data visualization ##########
+```{r}
+####  data manipulation for log-transformed plots
+    #df.tuk$sp.log <- log(df.tuk$abundance.sp, 10) # log10 transform species abundance
+    #df.tuk$fun.log <- log(df.tuk$hill.fun, 10)    # log10 transform functional diversity (Hill numbers)
+    #df.tuk$npp.log <- log(df.tuk$npp.y, 10)      # log10 transform functional diversity (Hill numbers)
+    #write.csv(df.tuk, "df.tuk.final3.csv")
+
+### FIGURE 1: Map of trees, point size = basal area, color = tree sp 
+  ggplot(tree.df, aes(x = gx, y = gy)) + geom_point(aes(color = sp.x.x, size = basal.area)) + theme_bw() + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), legend.position = "top") + ylab("Plot height (m)") + xlab("Plot length (m)")
+
+### FIGURE 2 = conceptual diagram
+
+### FIGURE 3: functional vs. species diversity in coniferous/deciduous 
+ ggplot(df.tuk, aes(x=hill.sp, y=hill.fun)) + geom_point() + geom_smooth(method = "lm", se=TRUE, formula = y ~ x)  + xlab("Hill number (species)") + ylab("Hill number (functional)")  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),panel.background = element_blank()) + scale_fill_manual(values=c("tomato","steelblue")) + geom_jitter(height= 0.6,width = 0.7)
+ 
+### FIGURE 4: NPP in coniferous/deciduous 
+  ggplot(df.tuk, aes(x=type.x, y=npp.log)) + geom_boxplot(aes(fill = type.x), size = 1.2) + xlab("Tree Type")+ ylab("Log 10 Net Primary Productivity (NPP)")  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),panel.background = element_blank()) + scale_x_discrete(labels = c('Coniferous','Deciduous')) + xlab("Tree type") + scale_fill_manual(values=c("snow2","steelblue3"))
+ 
+### FIGURE 5: species abundances vs. NPP # log transform this one too?
+   ggplot(df.tuk, aes(x=npp.y, y=abundance.sp)) + geom_point() + geom_smooth(method = "lm", se=TRUE, formula = y ~ x) + geom_point() + xlab("Net Primary Productivity (NPP)") + ylab("Ant colony density")  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),panel.background = element_blank()) + geom_jitter(height = 1, width = 0.01)
+  
+### FIGURE 6a: species diversity vs. NPP 
+ ggplot(df.tuk, aes(x=hill.sp, y=npp.y)) + geom_point() + geom_smooth(method = "lm", se=TRUE, formula = y ~ x) + xlab("Net Primary Productivity (NPP)") + ylab("Hill number (species)") + theme_bw()  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) + geom_jitter(height = 0.01, width = 0.5)
+ 
+### FIGURE 6b: functional diversity vs. NPP 
+ ggplot(df.tuk, aes(x=hill.fun, y=npp.y)) + geom_point() + geom_smooth(method = "lm", se=TRUE, formula = y ~ x) + xlab("Net Primary Productivity (NPP)") + ylab("Hill number (functional)") + theme_bw()  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) + geom_jitter(height = 0.01, width = 0.7)
+  
+### FIGURE 7a: shannon SPECIES diversity in coniferous/deciduous  #transform??
+  ggplot(df.tuk, aes(x=type.x, y=hill.sp)) + geom_boxplot(aes(fill = type.x), size = 1.2) + xlab("Tree Type")+ ylab("Hill number (species)")  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),panel.background = element_blank()) + scale_x_discrete(labels = c('Coniferous','Deciduous')) + xlab("Tree type") + scale_fill_manual(values=c("snow2","steelblue3")) 
+  
+### FIGURE 7b: shannon FUNCTIONAL diversity in coniferous/deciduous  #transform??
+  ggplot(df.tuk, aes(x=type.x, y=hill.fun)) + geom_boxplot(aes(fill = type.x), size = 1.2) + xlab("Tree Type") + ylab("Hill number (functional)")  + theme(text = element_text(size=18), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),panel.background = element_blank()) + scale_x_discrete(labels = c('Coniferous','Deciduous')) + xlab("Tree type") + scale_fill_manual(values=c("snow2","steelblue3")) 
+  
+### FIGURE 8: NMDS & CCA ordination graphs
+  
+```
+
+########## 2: ANOVAs ##########
+```{r}
+### Tree data ####
+ model.t = lm(npp_tuk.x ~  type.x,
+          data = df.tuk)
+  Anova(model.t, type="II")   #ANOVA with transformed data
+
+### Ant species ABUNDANCE data ### 
+  model = lm(abundance.sp ~ type.x +  npp_tuk.x,
+          data = df.tuk)
+  Anova(model, type="II")   #ANOVA with transformed data
+  
+    x = (residuals(model))
+    plotNormalHistogram(x)  #histogram
+    qqnorm(residuals(model),
+           ylab="Sample Quantiles for residuals")
+    qqline(residuals(model), 
+           col="red")       #QQ plot
+    plot(fitted(model),
+         residuals(model))  #plot of the residuals vs. the fitted values (heteroscedastic)
+    
+### Ant SPECIES data ### 
+  model = lm(hill.sp ~ type.x +  npp_tuk.x,
+          data = df.tuk)
+  Anova(model, type="II")   #ANOVA with transformed data
+  
+    x = (residuals(model))
+    plotNormalHistogram(x)  #histogram
+    qqnorm(residuals(model),
+           ylab="Sample Quantiles for residuals")
+    qqline(residuals(model), 
+           col="red")       #QQ plot
+    plot(fitted(model),
+         residuals(model))  #plot of the residuals vs. the fitted values (heteroscedastic)
+    
+### Ant FUNCIONAL data ### 
+  model = lm(hill.fun ~ type.x +  npp_tuk.x,
+          data = df.tuk)
+  
+  Anova(model, type="II")   #ANOVA with transformed data
+  
+    x = (residuals(model))
+    plotNormalHistogram(x)  #histogram
+    qqnorm(residuals(model),
+           ylab="Sample Quantiles for residuals")
+    qqline(residuals(model), 
+           col="red")       #QQ plot
+    plot(fitted(model),
+         residuals(model))  #plot of the residuals vs. the fitted values (heteroscedastic)
+```
+
+########## 3: GLM and stepAIC ##########
+```{r}
+#Plot frequency distrbutions
+  plotNormalHistogram(df.tuk$hill.sp) #species data
+  plotNormalHistogram(df.tuk$hill.fun) #functional data 
+  df.tuk$type.x <- as.factor(df.tuk$type.x) #convert tree type coumn to factor
+
+  sp.glm <- glm(formula = df.tuk$hill.sp ~ df.tuk$npp_tuk.y + df.tuk$type.x, family = Gamma) #SPECIES data
+  fun.glm <- glm(formula = df.tuk$hill.fun ~ df.tuk$npp_tuk.y + df.tuk$type.x, family = Gamma) #FUNCTIONAL data
+
+  stepAIC(sp.glm)  
+  stepAIC(fun.glm) #both variables significantly inform model 
+```
+
+########## ORDINATIONS ##########
+
+########## 4: Species div. original data (CCA) 
+```{r}
+#read in data 
+  df<- read.csv("site.sp.final2.csv", header=T)
+  df.env<- read.csv("df.env.npp2.csv", header=T)
+  
+#prep data 
+df<- df %>% column_to_rownames("Tree.ID")
+df.env<- df.env %>% column_to_rownames("Tree.ID") 
+attach (df.env)
+
+#CCA
+#4.1 
+ord <- cca(df ~  npp + type, data=df.env) #DBH as proxy for NPP?
+ ord; summary (ord)
+ plot(ord)
+
+anova(ord, by="term", permutations=199) #types?
+ anova(ord, by="axis", permutations=499)
+
+how <- how(nperm=499, plots = Plots(strata=df.env$type))
+anova(ord, by="term", permutations = how)
+
+#plot it 
+plot(ord, disp="sites", type="n")
+ordiellipse(ord, type, col=1:2, kind = "ehull", lwd=3, label = T)
+points(ord, disp="sites", pch=21, col="red", bg="yellow", cex=.5)
+points(ord, disp="spec", pch=3, col="blue", cex=.5)
+text(ord, display = "spec", cex=0.7, col="blue")
+#text(ord, display = "sites",cex=0.7, col="blue", offset = 5) 
+```
+
+########## 5: Functional div. original data (NMDS)
+```{r}
+#read in data
+  site.fun <- read.csv("site.fun2.csv")
+  df.env <- read.csv("env.data.final.csv")
+  
+#prep data
+  site.fun <- site.fun[-1:-2] 
+  site.fun <- aggregate(.~stem.tag, site.fun, sum); head(site.fun) #aggregate by stem.tag
+  rownames(site.fun) <- NULL
+  site.fun <- column_to_rownames(site.fun, var = "stem.tag") #columns to rownames
+  
+  ants.NMDS=metaMDS(site.fun,k=2,trymax=100)
+  stressplot(ants.NMDS)
+  plot(ants.NMDS)
+  
+  attach(df.env) #only run once
+  
+  #asthetics to match other ordination
+    plot(ants.NMDS, disp="sites", type="n")
+    ordiellipse(ants.NMDS, type, col=1:4, kind = "ehull", lwd=3, label = T)
+    points(ants.NMDS, disp="sites", pch=21, col="red", bg="yellow", cex=.5)
+    points(ants.NMDS, disp="spec", pch=3, col="blue", cex=.5)
+    text(ants.NMDS, display = "spec", cex=0.7, col="blue")
+
+  #fit environmental variables ##### not cooperating
+    ord.fit <- envfit(ants.NMDS ~ type + sp.x, data=df.env, perm=999) ### ERRROR WHY ?!?!?!?!
+    ord.fit
+    
+    plot(ants.NMDS, dis="site") #plot
+    plot(ord.fit)
+```
+
+########## 6: Species div. edited data (CCA)
+```{r}
+#read in data 
+  df<- read.csv("site.sp.edit.csv", header=T)
+  df.env <- read.csv("env.data.npp.csv", header=T)  
+  
+#prep data 
+  names(df)[1]<-"Tree.ID" 
+  df.env <- df.env[-1]
+  rownames(df) <- c()
+  rownames(df.env) <- c()
+  df <- df %>% column_to_rownames("Tree.ID")
+  df.env <- df.env %>% column_to_rownames("Tree.ID")
+  
+  attach (df.env)
+
+#CCA
+#4.1 
+ord <- cca(df ~  npp + type, data=df.env) 
+ ord; summary (ord)
+ plot(ord)
+
+anova(ord, by="term", permutations=199) #types?
+ anova(ord, by="axis", permutations=499)
+
+how <- how(nperm=499, plots = Plots(strata=df.env$type))
+anova(ord, by="term", permutations = how)
+
+#plot it 
+plot(ord, disp="sites", type="n")
+ordiellipse(ord, type, col=1:2, kind = "ehull", lwd=3, label = T)
+points(ord, disp="sites", pch=21, col="red", bg="yellow", cex=.5)
+points(ord, disp="spec", pch=3, col="blue", cex=.5)
+text(ord, display = "spec", cex=0.7, col="blue")
+#text(ord, display = "sites",cex=0.7, col="blue", offset = 5) 
+```
+
+########## 7: Functional div. edited data (NMDS)
+```{r}
+#load data 
+  site.sp <- read.csv("site.fun.edit.csv")
+  df.env <- read.csv("env.data.npp.csv")
+  
+  #prep data
+  site.sp <- site.sp %>% column_to_rownames("X")
+  df.env <- df.env[-1]
+  df.env<- df.env %>% column_to_rownames("Tree.ID") 
+  
+  ants.NMDS=metaMDS(site.sp,k=2,trymax=100)
+  stressplot(ants.NMDS)
+  plot(ants.NMDS)
+  
+  attach(df.env) #only run once
+  
+  #asthetics to match other ordination
+    plot(ants.NMDS, disp="sites", type="n")
+    ordiellipse(ants.NMDS, type, col=1:4, kind = "ehull", lwd=3, label = T)
+    points(ants.NMDS, disp="sites", pch=21, col="red", bg="yellow", cex=.5)
+    points(ants.NMDS, disp="spec", pch=3, col="blue", cex=.5)
+    text(ants.NMDS, display = "spec", cex=0.7, col="blue")
+
+  #fit environmental variables ##### not cooperating
+    ord.fit <- envfit(ants.NMDS ~ type + npp, data=df.env, perm=999) ### ERRROR WHY ?!?!?!?!
+    ord.fit
+    
+    plot(ants.NMDS, dis="site") #plot
+    plot(ord.fit)
+```
+
